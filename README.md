@@ -9,7 +9,7 @@ This repository contains code for the examples in https://arxiv.org/abs/2006.049
 * `R/example_computation.R` Compute prediction example data. Can be run as `source("R/example_computation.R")`
 * `R/example_plots.R` Make prediction plot, from data saved by the example computation code. Can be run as `source("R/example_plots.R")`
 * `R/globaltavg` Folder with multiple files for the global temperature example. See
-  [`R/globaltavg/README.txt`](R/globaltemperature/README.txt)
+  [`R/globaltavg/README.txt`](R/globaltavg/README.txt)
 * `Makefile` Makefile for the global temperature example. The full analysis
   can be run in a terminal by the following sequence:
 ```
