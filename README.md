@@ -1,6 +1,6 @@
 # Example code for non-separable space-time models
 
-This repository contains code for the examples in https://arxiv.org/abs/2006.04917, v4
+This repository contains code for the examples in https://arxiv.org/abs/2006.04917, v3
 
 * `R/handle_packages.R` Helper function for checking whether needed packages are installed
 * `R/S2C.R` Helper functions for using FFT to convert between spectral densities and covariances
