@@ -114,30 +114,30 @@ pl_2 <- ggplot(data) +
 plotfile_all_margs <- file.path(figures.dir, paste0("covar-all-marginals", ifelse(DIM == 2, "", "-1"), ".pdf"))
 plotfile_bivar <- file.path(figures.dir, paste0("covar-bivar", ifelse(DIM == 2, "", "-1"), ".pdf"))
 if (!overwrite_plots &&
-    file.exists(plotfile_all_margs)) {
+  file.exists(plotfile_all_margs)) {
   message("Displaying all marginal covariances")
   print(pl_1)
 } else {
   message(paste0("Saving plot with all marginals to ", plotfile_all_margs))
   dir.create(figures.dir, showWarnings = FALSE, recursive = TRUE)
   pdf(plotfile_all_margs,
-      pointsize = 20,
-      width = 7,
-      height = 4
+    pointsize = 20,
+    width = 7,
+    height = 4
   )
   print(pl_1)
   dev.off()
 }
 if (!overwrite_plots &&
-    file.exists(plotfile_bivar)) {
+  file.exists(plotfile_bivar)) {
   message("Displaying bivariate covariances")
   print(pl_2)
 } else {
   message(paste0("Saving plot with bivariate covariances to ", plotfile_bivar))
   pdf(plotfile_bivar,
-      pointsize = 20,
-      width = 7,
-      height = 4
+    pointsize = 20,
+    width = 7,
+    height = 4
   )
   print(pl_2)
   dev.off()
