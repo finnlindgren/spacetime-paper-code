@@ -11,7 +11,23 @@ use_parallel <- TRUE
 # number of cores to use for parallel computations
 n.cores <- 8
 # Where to store the data, to be read by R/covariance_plots.R
-data.dir <- here::here("covariance.data")
+data.dir <- here::here("covariance_data")
+
+source(file.path(R.dir, "handle_packages.R"))
+if (!handle_packages(c(
+  "tidyverse" = NA,
+  "fftwtools" = NA,
+  if (use_parallel) {
+    c(
+      "parallel" = NA,
+      "doSNOW" = NA
+    )
+  } else {
+    NULL
+  }
+))) {
+  stop("Packages not fully installed.")
+}
 
 dir.create(data.dir, showWarnings = FALSE, recursive = TRUE)
 source(file.path(R.dir, "S2C.R"))
@@ -122,7 +138,6 @@ model_defn_paper_example <-
     ## Model 3 in the paper figure
     2, 2, 0, 1, "D: Iterated diffusion"
   )
-model_defn$rt.factor <- 1
 
 # Fixed nu-values, varying beta_s
 model_defn_fixed_nu <-

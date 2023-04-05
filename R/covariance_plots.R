@@ -7,7 +7,7 @@ overwrite_plots <- FALSE
 DIM <- 2
 
 # Where to read the computed covariances, from R/covariance_computation.R
-data.dir <- here::here("covariance.data")
+data.dir <- here::here("covariance_data")
 # Where to save the figures, if overwrite_plots is TRUE
 figures.dir <- here::here("figures")
 
@@ -111,23 +111,33 @@ pl_2 <- ggplot(data) +
   xlab(expression("" ~ h[s])) +
   ylab(expression("" ~ h[t]))
 
-
-if (!overwrite_plots) {
+plotfile_all_margs <- file.path(figures.dir, paste0("covar-all-marginals", ifelse(DIM == 2, "", "-1"), ".pdf"))
+plotfile_bivar <- file.path(figures.dir, paste0("covar-bivar", ifelse(DIM == 2, "", "-1"), ".pdf"))
+if (!overwrite_plots &&
+    file.exists(plotfile_all_margs)) {
+  message("Displaying all marginal covariances")
   print(pl_1)
-  print(pl_2)
 } else {
+  message(paste0("Saving plot with all marginals to ", plotfile_all_margs))
   dir.create(figures.dir, showWarnings = FALSE, recursive = TRUE)
-  pdf(file.path(figures.dir, paste0("covar-all-margs", ifelse(DIM == 2, "", "-1"), ".pdf")),
-    pointsize = 20,
-    width = 7,
-    height = 4
+  pdf(plotfile_all_margs,
+      pointsize = 20,
+      width = 7,
+      height = 4
   )
   print(pl_1)
   dev.off()
-  pdf(file.path(figures.dir, paste0("covar-bivar", ifelse(DIM == 2, "", "-1"), ".pdf")),
-    pointsize = 20,
-    width = 7,
-    height = 4
+}
+if (!overwrite_plots &&
+    file.exists(plotfile_bivar)) {
+  message("Displaying bivariate covariances")
+  print(pl_2)
+} else {
+  message(paste0("Saving plot with bivariate covariances to ", plotfile_bivar))
+  pdf(plotfile_bivar,
+      pointsize = 20,
+      width = 7,
+      height = 4
   )
   print(pl_2)
   dev.off()

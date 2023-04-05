@@ -1,0 +1,273 @@
+---
+title: "How the data was processed"
+author: "For the spacetime SPDE paper"
+date: "`r format(Sys.Date(), '%B %d, %Y')`"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = !TRUE)
+library(sp)
+library(INLAspacetime)
+R.dir <- here::here("R", "globaltavg")
+data.dir <- here::here("data_files")
+year <- 2022
+```
+
+# The temperature data
+
+We used the mean between the daily minimum and maximum temperature data for year 
+`r format(year)`. 
+Here we show details on the data check performed.
+
+```{r loadstt}
+### all stations
+all.stt.ll <- readRDS(
+    file.path(data.dir, "all.stations.longlat.rds"))
+```
+
+```{r loadw2data}
+### TMIN and TMAX
+w2data <- readRDS(
+    file.path(data.dir, "w2data0.rds"))
+dd <- dim(w2data)[1:2]
+```
+
+```{r manipulate}
+### id to stations 
+iistt <- pmatch(dimnames(w2data)[[1]], all.stt.ll$station)
+
+### now define the average temperature
+source(file.path(R.dir, 'functions.R'))
+wtavg0 <- (w2data[,,1] + w2data[,,2])/20
+
+### to easily manipulate
+w3data <- array(c(w2data, wtavg0), dim(w2data)+c(0,0,1))
+names.vars <- c(dimnames(w2data)[[3]], "C. TAVG")
+nvars <- length(names.vars)
+
+### is NA
+w3na <- is.na(w3data)
+
+### Number of NA per station and variable
+ndat3s <- apply(!w3na, c(1,3), sum)
+nd0 <- c(365, 182, 60, (2:1)*7, 0)
+iil <- lapply(1:nvars, function(v)
+    lapply(1:(length(nd0)-1), function(d)
+        iistt[(ndat3s[,v]>nd0[d+1]) & (ndat3s[,v]<=nd0[d])]))
+
+### legend labels
+llabs <- lapply(1:nvars, function(i)
+    sapply(1:(length(nd0)-1), function(d) {
+        l0 <- paste0(length(iil[[i]][[d]]), ' with')
+        if(d==1) {
+            return(paste(l0, '>', nd0[d+1], 'obs.'))
+        } else {
+            return(paste(l0, nd0[d+1]+1, 'to', nd0[d], 'obs.'))
+        }
+    }))
+
+pcolors <- c('black', 'blue', 'green', 'red', 'magenta')
+```
+
+## The missings 
+
+There were `r format(dd[1])` stations with at least one observation on TMIN or TMAX.
+With no missing data, each station would have 365 observations 
+giving a total of `r format(prod(dd))` observations for each variable. 
+However, 
+`r format(sum(w3na[,,1]))` and
+`r format(sum(w3na[,,2]))`  observations
+were missing for TMIN and TMAX, respectively.
+In the next figure we have the number of stations 
+by the number of days with data for each variable, 
+including the computed average, C. TAVG. 
+Most of the stations have more than 351 observations.
+
+```{r freqt, fig.width=10, fig.height=5, fig.cap="Number of stations per number of days with data."}
+### Frequency of stations
+tk0 <- c(0, 1:25*13, 365); t0m <- (tk0[-1]+tk0[-length(tk0)])/2
+ndat3t <- apply(ndat3s, 2, function(x)
+    table(cut(x, tk0, include.lowest=TRUE)))
+
+### the plot
+tt0 <- 1:nrow(ndat3t)##c(0:15, -15:0+365)
+x0 <- 1:length(tt0)
+par(mfrow=c(1,1), mar=c(5,5,0.5,0), mgp=c(4,0.5,0), las=1)
+plot(x0 - 0.2, ndat3t[tt0,1], type='h', col='blue',
+     axes=FALSE, ylim=c(0, max(ndat3t)), lwd=3,
+     xlab='Number of days with data', ylab='Number of stations')
+points(x0 + 0.2, ndat3t[tt0,2], type='h', col='red', lwd=3)
+points(x0 + 0.0, ndat3t[tt0,3], type='h', col='green', lwd=3)
+axis(1, 1:length(tt0), rownames(ndat3t)[tt0], las=2)
+axis(2)
+legend("top", names.vars[c(1,3,2)], col= c("blue", "green", "red"), 
+       lty=1, lwd=4, bty="n", ncol=4)
+```
+
+In the next Figure we have the locations of each stations 
+with color representing the number of days with observation. 
+The computed temperature average has less data, in particular, 
+`r format(dd[1]-sum(sapply(iil[[3]], length)))` 
+stations ended with no data as a result of these stations 
+not having data on TMIN and TMAX at the same day.
+
+```{r map3s, fig.width=8, fig.height=12, fig.cap="Stations and the number of observations for each original variable."}
+par(mfrow=c(nvars,1), mar=c(0,0,0,0))
+for(i in 1:nvars) {
+    maps::map(col=gray(.5), mar=c(0,0,0,0))
+    for(d in 1:(length(nd0)-1)) 
+        points(all.stt.ll[iil[[i]][[d]], ], 
+               pch=c(19, 3, 4, 8, 19)[d], cex=0.5, col=pcolors[d])
+    legend(-180, -32, llabs[[i]], col=pcolors, #bty='n',
+           title=paste(names.vars[i], "stations"),
+           pch=c(19, 3, 4, 8, 19), 
+           bg = gray(0.9, 0.5), box.col = gray(0.9,0.5)) 
+}
+```
+
+```{r iissel}
+iissel <- which(ndat3s[,3]>14)
+nssel <- length(iissel)
+wtavg <- wtavg0[iissel, ]
+```
+
+We selected the `r format(nssel)` stations with more than two weeks of data. 
+
+# Outliers
+
+With the averaged temperature date, from now on we will just cal it the
+daily temperature, we performed an analysis to find possible outliers.
+We considered the standard deviation of each time series and also the
+standard deviation of a time series formed by the difference between the
+daily temperature data and its smoothed version,
+to also consider the possibility of locally outliers.
+
+Given a time series data $x_t$, $t = 1, \ldots, n$, 
+the smoothed data $y_t$ is defined as
+$y_t = \sum_{j=1}^{h-1} w_j * (x_{t-j}+x_{t+j})/2$,
+where $w_j, j=1,\ldots,h-1$ are weights considering 
+the Epanechnikov kernel computed as function of the 
+time lag $j$, $w_j = 1 - (j/h)^2$,
+for time lags from $1$ to $h-1$. We used $h=30$. 
+The standard deviation of $x_t$, $s$, the standard 
+deviation of the difference $x_t-y_t$, that is the difference
+between the observed data and its 
+smoothed version, $s_s$, were used.
+We defined outlier if $|x_t-m|>5s$ or $|x_t-y_t|>5s_s$, for $m=\sum_{t=1}^nx_t/n$.
+
+```{r outdetecting}
+wEpan <- 1-seq(0, 1, length=30)^2
+wEpan <- wEpan[2:(length(wEpan)-1)]
+wout <- parallel::mclapply(1:nssel, function(i) {
+  return(outDetect(wtavg[i,], weights = wEpan, ff = c(5,5)))
+}, mc.cores=8L)
+nout <- sapply(wout, sum, na.rm=TRUE)
+ntot.out <- sum(nout) 
+iout <- which(nout>0)
+```
+
+A total of `r format(ntot.out)` outliers were found 
+in `r format(length(iout))` time series as shown in the next Figures. 
+
+```{r outfig, fig.width=15, fig.height=10, fig.cap="Time series with detected oulier observations."}
+par(mfrow=c(7,7), mar=c(0.1,1.5,.1,.1), mgp=c(2,0.5,0))
+for(i in iout) {
+  m.i <- attr(wout[[i]], "m")
+  xs <- m.i + attr(wout[[i]], "xs")
+  ss <- attr(wout[[i]], "ss")
+  ii <- which(!is.na(xs)) 
+  plot(wtavg[i,], type='l', xlab='', ylab='', axes = FALSE)
+  polygon(c(ii, rev(ii), ii[1]), 
+          c(xs[ii]-5*ss, xs[rev(ii)]+5*ss, xs[ii[1]]-5*ss), 
+          col = gray(0.7, 0.5), border = gray(0.5, 0.5))
+  points(wtavg[i,], pch = 8, col = wout[[i]] + 1)
+  abline(h=m.i + c(-5, 0, 5)*attr(wout[[i]], "s"), lty = 2)
+  axis(2)
+}
+```
+
+Our decision was to remove all the detected outliers from the dataset. 
+This decision implied removing
+`r format(100*ntot.out/sum(ndat3s[,3]), digits=4)`\% 
+of the observations.
+```{r rmout}
+### set NA to detected outliers
+for (i in iout) {
+    wtavg[i, which(wout[[i]])] <- NA
+}
+```
+
+
+# Local temporal variability 
+
+The second test is to find time periods with 
+too low or too high variability. 
+To do this we computed the standard error for sub-periods of each time series. 
+For each period the standard deviation was computed. 
+We checked if any of these standard deviations were 10 times 
+lower or greater than the average of these standard deviations.
+We did this test considering four different sub-periods definition. 
+One considering 17 periods of 21 days starting at day 1 and ending at day 357. 
+The second considering also 17 periods of 21 days, but from day 9 to day 365. 
+A third considering 23 periods of 15 days, from day 1 to day 360. 
+The fourth also with 23 periods of 15, but from day 6 to day 365.
+
+```{r std2subs}
+ss.setups <- list(
+  s1 = list(jj = 1:357, nsub = 21, fs = 10), 
+  s2 = list(jj = 9:365, nsub = 21, fs = 10), 
+  s2 = list(jj = 1:360, nsub = 15, fs = 10), 
+  s2 = list(jj = 6:365, nsub = 15, fs = 10))
+
+ss.results <- parallel::mclapply(ss.setups, function(s) {
+  sapply(1:nrow(wtavg), function(i) 
+    stdSubs(wtavg[i, s$jj], nsub = s$nsub, fs = s$fs))
+}, mc.cores = 4L)
+
+stdsubs <- Reduce("+", ss.results)>0 
+istdout <- which(stdsubs)
+nstdout <- length(istdout)
+
+rm.periods <- vector('list', nstdout)
+
+snames <- c("USC00091732", "USC00411048", "USC00412786", "USC00413507",
+            "USC00518108", "USR0000ACOT", "USS0021B31S", "USS0022C12S",
+            "USW00000230", "USW00053952")##, "USS0022G24S")
+i.s.rm <- which(dimnames(wtavg)[[1]][istdout] %in% snames)
+
+stopifnot(length(i.s.rm)==10)
+
+rm.periods[[i.s.rm[1]]] <- 178:243
+rm.periods[[i.s.rm[5]]] <- 170:365
+rm.periods[[i.s.rm[6]]] <- 1:133 
+rm.periods[[i.s.rm[7]]] <- 235:340
+rm.periods[[i.s.rm[8]]] <- 294:331
+##	rm.periods[[i.s.rm[5]]] <- 210:365
+
+cat("Manually set to NA data on days\n")
+for(i in 1:nstdout) {
+  if(length(rm.periods[[i]])>0)
+    cat(rm.periods[[i]], "\nof station", dimnames(wtavg)[[1]][istdout[i]], "\n")
+}
+```
+
+We found `r format(nstdout)` time series with periods of low variability.
+Then we manually removed the data represented with points in red color 
+in the next Figure. 
+
+```{r stdoutfig, fig.width=7, fig.height=3*max(3,round(nstdout/10)), fig.cap="Time series with detected locally low/high variations."}
+par(mfrow=c(max(3, round(nstdout/10)), 1), mar=c(2,2,2,.1), mgp=c(2,0.5,0))
+for(i in 1:nstdout) {
+  plot(wtavg[istdout[i],], type='l', xlab='', ylab='', axes = FALSE, 
+       main = dimnames(wtavg)[[1]][istdout[i]]) 
+  points(wtavg[istdout[i],], pch=8, col = 1 + (1:365%in%rm.periods[[i]]))
+  axis(1, 5*(0:73), las=2)
+  axis(2)
+}
+```
+
+```{r rmperiods}
+for (i in 1:length(istdout))
+  wtavg[istdout[i], rm.periods[[i]]] <- NA
+```

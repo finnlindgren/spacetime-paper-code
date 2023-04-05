@@ -17,7 +17,7 @@ sinc <- function(x) {
   # Set errors equal (approximatively):
   # x^4 / 120 = 2 * eps
   # x = (240 * eps)^{1/4}
-  x0 <- (240 * .Machine$double.eps)^(1/4)
+  x0 <- (240 * .Machine$double.eps)^(1 / 4)
   ok <- abs(x) > x0
   if (all(ok)) {
     f <- f / x
@@ -28,7 +28,7 @@ sinc <- function(x) {
   f
 }
 
-#' Title
+#' Compute folded spectrum for spatial discretisation
 #'
 #' @param omega
 #' @param S_fun
@@ -153,7 +153,6 @@ S2C <- function(S, dim, h) {
 #' @export
 #'
 #' @examples
-
 S2sample <- function(S, dim, h, seed = NULL, conjugate = FALSE) {
   if (!is.null(seed)) {
     set.seed(seed)
@@ -166,47 +165,47 @@ S2sample <- function(S, dim, h, seed = NULL, conjugate = FALSE) {
     stop(paste0("Dimension ", length(dim), " is not implemented."))
   }
   SD <- sqrt(S * prod(2 * pi / h / dim))
-  z <- (rnorm(prod(dim)) + 1i*rnorm(prod(dim))) * SD
+  z <- (rnorm(prod(dim)) + 1i * rnorm(prod(dim))) * SD
   if (conjugate) {
-    k <- expand.grid(lapply(dim, function(d) seq_len(d) - 1 - d/2))
+    k <- expand.grid(lapply(dim, function(d) seq_len(d) - 1 - d / 2))
     # Find symmetry pairs and make them complex conjugate
     if (length(dim) == 1) {
       # Note: this can be implemented much more efficiently...
       pair <- rep(NA_integer_, nrow(k))
       for (idx in seq_len(nrow(k))) {
-        pair_ <- k[idx,1] == -k[,1]
+        pair_ <- k[idx, 1] == -k[, 1]
         if (any(pair_)) {
           pair[idx] <- which(pair_)
         }
       }
-      idx_ <- (k[,1] < 0) & !is.na(pair)
+      idx_ <- (k[, 1] < 0) & !is.na(pair)
       z[idx_] <- Re(z[pair[idx_]]) - 1i * Im(z[pair[idx_]])
-      idx_ <- (k[,1] == 0) | is.na(pair)
+      idx_ <- (k[, 1] == 0) | is.na(pair)
       z[idx_] <- Re(z[idx_])
     } else { # length(dim) == 2
       # Note: this can be implemented much more efficiently...
       pair <- rep(NA_integer_, nrow(k))
       for (idx in seq_len(nrow(k))) {
-        pair_ <- (k[idx,1] == -k[,1]) & (k[idx,2] == -k[,2])
+        pair_ <- (k[idx, 1] == -k[, 1]) & (k[idx, 2] == -k[, 2])
         if (any(pair_)) {
           pair[idx] <- which(pair_)
         }
       }
-      idx_ <- (k[,1] < 0) & !is.na(pair)
+      idx_ <- (k[, 1] < 0) & !is.na(pair)
       z[idx_] <- Re(z[pair[idx_]]) - 1i * Im(z[pair[idx_]])
-      idx_ <- (k[,1] == 0) & (k[,2] < 0) & !is.na(pair)
+      idx_ <- (k[, 1] == 0) & (k[, 2] < 0) & !is.na(pair)
       z[idx_] <- Re(z[pair[idx_]]) - 1i * Im(z[pair[idx_]])
-      idx_ <- ((k[,1] == 0) & (k[,2] == 0)) | is.na(pair)
+      idx_ <- ((k[, 1] == 0) & (k[, 2] == 0)) | is.na(pair)
       z[idx_] <- Re(z[idx_])
     }
   } else { # !conjugate
-    k <- expand.grid(lapply(dim, function(d) seq_len(d) - 1 - d/2))
+    k <- expand.grid(lapply(dim, function(d) seq_len(d) - 1 - d / 2))
     # Find lower edges and set to zero
     if (length(dim) == 1) {
-      edge <- k[,1] == -dim[1]/2
+      edge <- k[, 1] == -dim[1] / 2
       z[edge] <- 0
     } else { # length(dim) == 2
-      edge <- (k[,1] == -dim[1]/2) | (k[,2] == -dim[2]/2)
+      edge <- (k[, 1] == -dim[1] / 2) | (k[, 2] == -dim[2] / 2)
       z[edge] <- 0
     }
   }
@@ -295,8 +294,3 @@ make_omega_sampling <- function(dim, h) {
   }
   w
 }
-
-
-
-
-
