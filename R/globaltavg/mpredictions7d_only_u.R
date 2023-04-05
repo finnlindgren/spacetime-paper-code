@@ -15,18 +15,19 @@ ldata <- readRDS(file.path(data.dir, "longdata.rds"))
 (ntimes <- max(ldata$time))
 
 ### set prior for the likelihood parameter
-lprec <- list(theta=list(prior="pc.prec", param=c(1,0.5)))
+lprec <- list(theta = list(prior = "pc.prec",
+                           param = c(1,0.5)))
 
 ### inla options
 inla.setOption(
-    inla.mode="compact",
-    smtp="pardiso",
-    pardiso.license="~/.pardiso.lic",
-    num.threads="1:-4") 
+    inla.mode = "compact",
+    smtp = "pardiso",
+    pardiso.license = "~/.pardiso.lic",
+    num.threads = "1:-4") 
 
 ### define control.compute options
-ccomp <- list(dic=TRUE, cpo=TRUE, waic=TRUE,
-              mlik=TRUE, return.marginals=FALSE)
+ccomp <- list(dic = TRUE, cpo = TRUE, waic = TRUE,
+              mlik = TRUE, return.marginals = FALSE)
 
 stations <- readRDS(file.path(data.dir, "stations.longlat.rds"))
 
@@ -37,7 +38,7 @@ ls()
 c(gmesh$n, tmesh$n)
 
 ### space time model domain setting
-(nst <- tmesh$n*gmesh$n)
+(nst <- tmesh$n * gmesh$n)
 
 cat("# mesh nodes:", gmesh$n, "\n",
     "# time knots:", tmesh$n, "\n",
@@ -55,9 +56,68 @@ mm.times <- lapply(mm, function(m) {
 str(mm.times)
     
 ### for M0 is the same as the other case
-system(paste("cp",
-             file.path(data.dir, "tavg_m0_mpred.rds"),
-             file.path(data.dir, "tavg_m0_mpred_u.rds")))
+### define the spatial SPDE model for v
+sspde <- inla.spde2.pcmatern(
+    gmesh, alpha = 2,
+    prior.range = c(1000/6371, 0.01),
+    prior.sigma = c(5, 0.01),
+    constr = TRUE) ## not needed, here is the right place to set it
+
+### define the mapper for the spatial model
+smapper <- bru_mapper(gmesh)
+
+##################################################################
+#### M0
+### output files
+rfl <- file.path(data.dir, paste0("tavg_m0_n", ndata, ".rds"))
+mpredfl <- file.path(data.dir, "tavg_m0_mpred.rds")
+
+sres <- readRDS(rfl)
+theta.ini <- sres$mode$theta
+
+### define model components
+M0f <- ~ 0 + mu + elev +
+    south.t1 + south.t2 + south.t3 +
+    north.t1 + north.t2 + north.t3 +
+    space(cbind(s1loc, s2loc, s3loc),
+          model = sspde, mapper = smapper,
+          replicate = time, replicate_mapper = time.basis)
+
+mpred <- mclapply(mm, function(m) {
+
+### define the data and prediction scenario
+    sdata <- ldata[ldata$time %in% mm.times[[m]], ]
+    sdata$y0 <- sdata$y
+    iipred <- which(sdata$time %in% tail(sort(unique(sdata$time)), 7))
+    sdata$y0[iipred] <- NA
+
+### define the likelihood part
+    lhood <- like(
+        formula = y0 ~ ., ## y0 for prediction
+        family="gaussian",
+        control.family = list(
+            hyper = lprec),
+        data=sdata)
+
+### evaluate the prediction at the posterior mode of the hyperparameters
+    pred <- bru(
+        components = M0f, 
+        lhood,
+        options = list(
+            control.compute = ccomp,
+            control.mode = list(theta = theta.ini, fixed = TRUE), 
+            control.inla = list(int.strategy = "eb")))
+    
+### return the predicted summary
+    spred <- pred$summary.fitted.values[iipred, ]
+    rownames(spred) <- NULL
+    return(spred)
+    
+}, mc.cores = 4L)
+
+### save the fitted values summary
+saveRDS(object = mpred,
+        file = mpredfl)
 
 ### the spacetime mapper for u on the full time period
 ### to be used to compute u(s,t) at the observations level
@@ -72,7 +132,7 @@ stmapper.full <-
 #################################################################################
 
 inla.setOption(
-    num.threads="1:1") 
+    num.threads = "1:1") 
 
 ### models id
 models <- c("102", "121", "202", "220")
@@ -173,7 +233,6 @@ for(imodel in 1:4) {
             components = Mcomps.u,
             lhood,
             options = list(
-                verbose = !TRUE,
                 control.compute = ccomp,
                 control.mode = list(theta = theta.ini, fixed = TRUE),
                 control.inla = list(int.strategy = "eb")))
