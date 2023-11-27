@@ -4,12 +4,9 @@
 data.dir <- here::here("data_files")
 figures.dir <- here::here("figures")
 
-library(rgeos)
 library(INLA)
 library(INLAspacetime)
 library(inlabru)
-library(sp)
-library(maptools)
 library(rgeos)
 
 sp::set_evolution_status(2L)

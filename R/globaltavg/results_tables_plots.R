@@ -3,6 +3,7 @@
 library(INLA)
 library(INLAspacetime)
 library(inlabru)
+library(fmesher)
 library(fields)
 library(RColorBrewer)
 library(ggplot2)
@@ -14,7 +15,6 @@ library("sf")
 library("rnaturalearth")
 library("rnaturalearthdata")
 library(patchwork)
-sp::set_evolution_status(2L)
 
 data.dir <- here::here("data_files")
 fig.dir <- here::here("figures")
@@ -33,14 +33,14 @@ c(gmesh$n, tmesh$n)
 
 gmesh$crs <- fm_CRS("sphere")
 
-m_u <- inlabru::fm_transform(gmesh, crs = fm_crs("globe"))
+m_u <- fm_transform(gmesh, crs = fm_crs("globe"))
 cat(paste0(
   "Average node distance (km): ",
   paste0(
     "v = ",
     round(
       c(
-        u = median((INLA::inla.mesh.fem(m_u)$va / pi)^0.5 * 2)
+        u = median((fm_fem(m_u)$va / pi)^0.5 * 2)
       ),
       digits = 3
     ),
@@ -48,7 +48,7 @@ cat(paste0(
   )
 ), "\n")
 
-mtags <- c(0, LETTERS[1:4])
+mtags <- model_names
 
 ### results for each model fitted
 results <- vector("list", length = 5L)
@@ -63,38 +63,63 @@ for (i in 1:5) {
     paste0("tavg_m", i - 1, "_mpred_u.rds")
   )) ## NEW: tavg_m[0-4]_mpred_u.rds
 }
-names(results) <- paste0("M", c(0, LETTERS[1:4]))
+model_names <- c("M0", LETTERS[1:4])
 model_names_latex <- paste0("$\\M", c("o", letters[1:4]), "$")
+names(results) <- model_names
 
 ### some outputs
-sapply(results, function(x) x$cpu)
-sapply(results, function(x) x$cpu[["Total"]]) / 3600 ## in h
+sapply(results, function(x) x$cpu.used)
+sapply(results, function(x) x$cpu.used[["Total"]]) / 3600 ## in h
 sapply(results, function(x) unname(x$mode$theta))
 sapply(results, function(x) x$mlik[[2]])
-sapply(results, function(x) x$summary.fix$mean)
+sapply(results, function(x) x$summary.fixed$mean)
 
 ### gof stats
 round(gof.tab <- as.data.frame(t(sapply(results, function(r) r$stats))), 5)
 
-df <- as.matrix(gof.tab)
+df <- t(as.matrix(gof.tab))
 df[1:length(as.vector(df))] <- sprintf("%1.4f", df)
-rownames(df) <- model_names_latex
-colnames(df) <- toupper(colnames(df))
-colnames(df)[1] <- "$R^2$"
-for (k in seq_len(ncol(df))) {
+colnames(df) <- model_names_latex
+rownames(df) <- toupper(rownames(df))
+rownames(df)[1] <- "$R^2$"
+for (k in seq_len(nrow(df))) {
   if (k == 1) {
     i <- which.max(gof.tab[, k])
   } else {
     i <- which.min(gof.tab[, k])
   }
-  df[i, k] <- paste0("\\textbf{", df[i, k], "}")
+  df[k, i] <- paste0("\\textbf{", df[k, i], "}")
 }
-df <- cbind(Model = rownames(df), df)
+df <- rbind(Model = colnames(df), df)
 print(
-  xtable::xtable(df, align = "lrrrrrrrrrr", digits = 5),
+  xtable::xtable(df, align = "lrrrrr", digits = 5),
   sanitize.text.function = function(x) x,
-  include.rownames = FALSE
+  include.colnames = FALSE,
+  include.rownames = TRUE
 )
+
+# df <- as.matrix(gof.tab)
+# df[1:length(as.vector(df))] <- sprintf("%1.4f", df)
+# rownames(df) <- model_names_latex
+# colnames(df) <- toupper(colnames(df))
+# colnames(df)[1] <- "$R^2$"
+# for (k in seq_len(ncol(df))) {
+#   if (k == 1) {
+#     i <- which.max(gof.tab[, k])
+#   } else {
+#     i <- which.min(gof.tab[, k])
+#   }
+#   df[i, k] <- paste0("\\textbf{", df[i, k], "}")
+# }
+# df <- cbind(Model = rownames(df), df)
+# print(
+#   xtable::xtable(df, align = "lrrrrrrrrrr", digits = 5),
+#   sanitize.text.function = function(x) x,
+#   include.rownames = FALSE
+# )
+
+
+
 
 crps.g <- function(y, m, s) {
   md <- y - m
@@ -143,7 +168,7 @@ mpred.ts <- do.call("rbind", lapply(1:length(mm), function(m) {
     ns <- ncol(ss) - 1
     df <- data.frame(
       Month = month.abb[m],
-      Model = paste0("M", c(0, LETTERS[1:4])[i]),
+      Model = model_names[i],
       Time = rep(ss$time, ns),
       Score = rep(colnames(ss)[-1], each = nrow(ss)),
       Statistic = unlist(ss[, -1])
@@ -168,19 +193,19 @@ gg.mpred <- ggplot(mpred.ts) +
 
 gg.mpred.diff <-
   left_join(mpred.ts,
-    mpred.ts %>% filter(Model == "MD"),
+    mpred.ts %>% filter(Model == "D"),
     by = c("Month", "Time", "ahead", "Score"),
-    suffix = c("", ".MD")
+    suffix = c("", ".D")
   ) %>%
   filter(!(Score %in% "ME")) %>%
-  filter(!(Model %in% "MD")) %>%
+  filter(!(Model %in% "D")) %>%
   ggplot() +
-  geom_line(aes(x = ahead, y = Statistic - Statistic.MD, color = Month, lty = Month)) +
+  geom_line(aes(x = ahead, y = Statistic - Statistic.D, color = Month, lty = Month)) +
   theme_minimal() +
   theme(plot.margin = margin(t = 0, r = 0, b = 0, l = 0)) +
   geom_abline(slope = 0, intercept = 0, linetype = 2) +
   xlab("Days ahead") +
-  ylab("Statistic difference to MD") +
+  ylab("Statistic difference to D") +
   facet_grid(vars(Score), vars(Model), scales = "free")
 
 gg.mpred
@@ -225,18 +250,18 @@ ggb1.mpred <-
 
 ggb2.mpred <-
   left_join(mpred.ts,
-    mpred.ts %>% filter(Model == "MD"),
+    mpred.ts %>% filter(Model == "D"),
     by = c("Month", "Time", "ahead", "Score"),
-    suffix = c("", ".MD")
+    suffix = c("", ".D")
   ) %>%
   filter(Score %in% c("MAE", "MSE", "DS", "SCRPS")) %>%
   ggplot() +
-  geom_boxplot(aes(x = factor(ahead), y = Statistic - Statistic.MD, fill = Model)) +
+  geom_boxplot(aes(x = factor(ahead), y = Statistic - Statistic.D, fill = Model)) +
   theme_minimal() +
   theme(plot.margin = margin(t = 0, r = 0, b = 0, l = 0)) +
   geom_abline(slope = 0, intercept = 0, linetype = 2) +
   xlab("Days ahead") +
-  ylab("Score difference to MD") +
+  ylab("Score difference to D") +
   facet_wrap(~Score, scales = "free", nrow = 2)
 
 png(file.path(fig.dir, "forecast_error.png"),
@@ -309,14 +334,14 @@ hstabs <- lapply(results, function(r) {
 lapply(hstabs, round, 4)
 
 df <-
-  t(sapply(hstabs[2:5], function(m) {
+  sapply(hstabs[2:5], function(m) {
     paste0(
       sprintf("%2.2f", m[1, ]), " (",
       sprintf("%2.3f", m[2, ]), ")"
     )
-  }))
-rownames(df) <- model_names_latex[-1]
-colnames(df) <- paste0(
+  })
+colnames(df) <- model_names_latex[-1]
+rownames(df) <- paste0(
   "$",
   c(
     "\\sigma_e",
@@ -329,7 +354,7 @@ colnames(df) <- paste0(
   "$"
 )
 print(
-  xtable::xtable(df, align = "lrrrrrr"),
+  xtable::xtable(df, align = "lrrrr"),
   sanitize.text.function = function(x) x
 )
 
@@ -389,7 +414,7 @@ if (FALSE) {
   for (imodel in 2:5) {
     hist(results[[imodel]]$summary.random$spacetime$mean, 100,
       xlab = "", ylab = "",
-      main = paste0("Posterior mean of u in M_", LETTERS[imodel - 1])
+      main = paste0("Posterior mean of u in ", model_names[imodel])
     )
   }
 }
@@ -427,12 +452,12 @@ str(seasonal.lat.fit)
 mu0fl <- file.path(fig.dir, "seasonal_latitude.png")
 mu0fl
 b_rasters <- c(
-  rast(t(seasonal.lat.fit[["MA"]])[181:1, ]),
-  rast(t(seasonal.lat.fit[["MB"]])[181:1, ]),
-  rast(t(seasonal.lat.fit[["MC"]])[181:1, ]),
-  rast(t(seasonal.lat.fit[["MD"]])[181:1, ])
+  rast(t(seasonal.lat.fit[["A"]])[181:1, ]),
+  rast(t(seasonal.lat.fit[["B"]])[181:1, ]),
+  rast(t(seasonal.lat.fit[["C"]])[181:1, ]),
+  rast(t(seasonal.lat.fit[["D"]])[181:1, ])
 )
-names(b_rasters) <- c("MA", "MB", "MC", "MD")
+names(b_rasters) <- model_names[-1]
 ext(b_rasters) <- c(
   xmin = 1,
   xmax = length(timeDate0),
@@ -561,7 +586,7 @@ for (el in 1:2) {
     ### project selected time to the grid
     v.grid <- lapply(results[-1], function(r) {
       v3m <- inla.mesh.project(
-        pgridl, matrix(r$summary.ran$space$mean, ncol = 3)
+        pgridl, matrix(r$summary.random$space$mean, ncol = 3)
       )
       vv <- kronecker(Btime0[, 1], v3m[, 1])
       if (ncol(Btime0) > 1) {
@@ -594,7 +619,7 @@ for (el in 1:2) {
         mtag <- mtags[1 + i]
         wzz <- matrix(NA, length(wx0y0$x), length(wx0y0$y))
         wzz[ii.wxy0] <- drop(v.grid[[i]][, j])
-        cat("E(v|y,M", LETTERS[i], ") range: ",
+        cat("E(v|y,", model_names[i+1], ") range: ",
           paste(format(range(wzz, na.rm = TRUE), digits = 4),
             collapse = " to "
           ), "\n",
@@ -623,7 +648,7 @@ for (el in 1:2) {
           theme_minimal() +
           labs(fill = "v(s,t)") +
           ggtitle(paste0(
-            "M", mtag,
+            mtag,
             ": ",
             format(timeDate0[tmesh$loc[jj1[j]]], "%b %d")
           )) +
@@ -644,8 +669,11 @@ for (el in 1:2) {
       plot_layout(guides = "collect") &
       theme(
         legend.position = "bottom",
+        legend.title = element_text(size = 14),
+        legend.text = element_text(size = 14),
+        legend.key.width = unit(3, "cm"),
         plot.title = element_text(
-          size = 10
+          size = 12
         )
       ))
 
@@ -696,7 +724,7 @@ for (el in 1:2) {
     u.grid <- lapply(results[-1], function(r) {
       inla.mesh.project(
         pgridl, matrix(
-          r$summary.ran$spacetime$mean,
+          r$summary.random$spacetime$mean,
           gmesh$n
         )[, jj1]
       )
@@ -723,7 +751,7 @@ for (el in 1:2) {
         mtag <- mtags[1 + i]
         wzz <- matrix(NA, length(wx0y0$x), length(wx0y0$y))
         wzz[ii.wxy0] <- drop(u.grid[[i]][, j])
-        cat("E(u|y,M", LETTERS[i], ") range: ",
+        cat("E(u|y,", model_names[i+1], ") range: ",
           paste(format(range(wzz, na.rm = TRUE), digits = 4),
             collapse = " to "
           ), "\n",
@@ -752,7 +780,7 @@ for (el in 1:2) {
           theme_minimal() +
           labs(fill = "u(s,t)") +
           ggtitle(paste0(
-            "M", mtag,
+            mtag,
             ": ",
             format(timeDate0[tmesh$loc[jj1[j]]], "%b %d")
           )) +
@@ -773,8 +801,11 @@ for (el in 1:2) {
       plot_layout(guides = "collect") &
       theme(
         legend.position = "bottom",
+        legend.title = element_text(size = 14),
+        legend.text = element_text(size = 14),
+        legend.key.width = unit(3, "cm"),
         plot.title = element_text(
-          size = 10
+          size = 12
         )
       ))
 
