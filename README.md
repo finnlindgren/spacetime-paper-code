@@ -10,7 +10,8 @@ This repository contains code for the examples in https://arxiv.org/abs/2006.049
 * `R/example_plots.R` Make prediction plot, from data saved by the example computation code. Can be run as `source("R/example_plots.R")`
 * `R/globaltavg` Folder with multiple files for the global temperature example. See
   [`R/globaltavg/README.txt`](R/globaltavg/README.txt)
-* `Makefile` Makefile for the global temperature example. The full analysis
+* `Makefile` Makefile for the global temperature example, covariance plots, and
+  simulation example. The full temperature analysis
   can be run in a terminal by the following sequence:
 ```
 # Download, check and prepare the data:
@@ -23,6 +24,13 @@ make plot_pre
 make model_fitting
 # Produce tables and plots:
 make results
+```
+  For the covariance and example plots (automatically runs the
+  `covariance_computation` and `example_computation` targets first unless
+  the result files already exist:
+```
+make covariance_plots
+make example_plots
 ```
 
 Main location

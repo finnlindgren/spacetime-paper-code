@@ -2,7 +2,9 @@ R.dir <- here::here("R")
 # Must run in the directory above the R code.
 stopifnot(file.exists(file.path(R.dir, "covariance_computation.R")))
 
-DIM <- 2 # spatial dimension (only 1d and 2d implemented)
+if (!exists("DIM")) {
+  DIM <- 2 # spatial dimension (only 1d and 2d implemented)
+}
 
 # number of points in each direction to evaluate the covariance function in
 N <- 64
@@ -14,7 +16,7 @@ n.cores <- 8
 data.dir <- here::here("covariance_data")
 
 source(file.path(R.dir, "handle_packages.R"))
-if (!handle_packages(c(
+pkgs <- c(
   "tidyverse" = NA,
   "fftwtools" = NA,
   if (use_parallel) {
@@ -25,18 +27,11 @@ if (!handle_packages(c(
   } else {
     NULL
   }
-))) {
-  stop("Packages not fully installed.")
-}
+)
+handle_packages(pkgs, attach = TRUE)
 
 dir.create(data.dir, showWarnings = FALSE, recursive = TRUE)
 source(file.path(R.dir, "S2C.R"))
-
-library(tidyverse)
-if (use_parallel) {
-  library(parallel)
-  library(doSNOW)
-}
 
 #' @param w_s the norm of the spatial (angular) wave number vector
 #' @param w_t temporal norm of the temporal (angular) frequency
@@ -78,7 +73,7 @@ nonsep_space_cross_spectrum <- function(w_s, ht, gamma_v, alpha_v, DIM) {
 
 # Explicit integration for time, FFT for space
 # hx must be an increasing regularly spaced vector, starting at 0
-nonsep_covar <- function(hx, ht, gamma_v, alpha_v, tol, DIM,
+nonsep_covar <- function(hx, ht, gamma_v, alpha_v, DIM,
                          expand_factor = 2) {
   # alpha = [alpha_t alpha_s alpha_e]
   # gamma = [gamma_t gamma_s gamma_0]
@@ -222,13 +217,13 @@ for (model.id in seq_len(nrow(model_defn))) {
 
   if (use_parallel) {
     parallel::clusterExport(cl,
-      varlist = c("hx", "ht", "gamma_v", "alpha_v", "tol", "DIM"),
+      varlist = c("hx", "ht", "gamma_v", "alpha_v", "DIM"),
       envir = environment()
     )
     par <- foreach(j = 1:N) %dopar% {
       res <- NA
       try({
-        res <- nonsep_covar(hx, ht[j], gamma_v, alpha_v, tol, DIM)
+        res <- nonsep_covar(hx, ht[j], gamma_v, alpha_v, DIM)
         res <- res[, 1]
       })
       return(res)
@@ -238,7 +233,7 @@ for (model.id in seq_len(nrow(model_defn))) {
     C <- matrix(0, length(hx), length(ht))
     for (j in 1:N) {
       cat(".")
-      res <- nonsep_covar(hx, ht[j], gamma_v, alpha_v, tol, DIM)
+      res <- nonsep_covar(hx, ht[j], gamma_v, alpha_v, DIM)
       C[, j] <- res[, 1]
     }
   }

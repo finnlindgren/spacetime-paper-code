@@ -1,7 +1,13 @@
 ### The code to create the temporal and spatial meshes
 
 ### libraries
-library(INLA)
+source(here::here("R", "handle_packages.R"))
+handle_packages(
+  c(
+    INLA = NA,
+    fmesher = NA
+  ),
+  attach = TRUE)
 
 ### data directory
 data.dir <- here::here("data_files")
@@ -41,7 +47,7 @@ sresol <- c(7, 0.05)
 (ntimes <- max(ldata$time))
 time0.h <- seq(1, ntimes + h.t * .99, h.t)
 cat("time mesh domain:", range(time0.h), "\n")
-tmesh <- inla.mesh.1d(time0.h)
+tmesh <- fm_mesh_1d(time0.h)
 
 ### transform data locations to sphere
 locs.sph <- inla.mesh.map(

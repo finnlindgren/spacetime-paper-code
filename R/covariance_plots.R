@@ -11,12 +11,16 @@ data.dir <- here::here("covariance_data")
 # Where to save the figures, if overwrite_plots is TRUE
 figures.dir <- here::here("figures")
 
-source("R/S2C.R")
+source(file.path(R.dir, "handle_packages.R"))
+pkgs <- c(
+  "tidyverse" = NA,
+  "ggplot2" = NA,
+  "patchwork" = NA,
+  "metR" = NA # For geom_contour_fill
+)
+handle_packages(pkgs, attach = TRUE)
 
-library(tidyverse)
-library(ggplot2)
-library(patchwork)
-library(metR) # For geom_contour_fill
+source("R/S2C.R")
 
 data_filename <- file.path(data.dir, paste0("image-all-dim-", DIM, ".Rdata"))
 if (!file.exists(data_filename)) {

@@ -3,9 +3,13 @@
 ### for the first 14 days of each month to predict 7 days ahead
 
 ### libraries
-library(INLA)
-library(INLAspacetime)
-library(inlabru)
+source(here::here("R", "handle_packages.R"))
+handle_packages(
+  c(
+    INLA = NA,
+    INLAspacetime = NA,
+    inlabru = NA),
+  attach = TRUE)
 
 data.dir <- here::here("data_files")
 
@@ -21,12 +25,14 @@ lprec <- list(theta = list(
 ))
 
 ### inla options
-inla.setOption(
-  inla.mode = "compact",
-  smtp = "pardiso",
-  pardiso.license = "~/.pardiso.lic",
-  num.threads = "1:-4"
-)
+if (file.exists("~/.pardiso.lic")) {
+  inla.setOption(
+    inla.mode = "compact",
+    smtp = "pardiso",
+    pardiso.license = "~/.pardiso.lic",
+    num.threads = "1:-4"
+  )
+}
 
 ### define control.compute options
 ccomp <- list(
@@ -80,7 +86,7 @@ smapper <- bru_mapper(gmesh)
 ##################################################################
 #### M0
 ### output files
-rfl <- file.path(data.dir, paste0("tavg_m0_n", ndata, ".rds"))
+rfl <- file.path(data.dir, paste0("tavg_m0_fit.rds"))
 mpredfl <- file.path(data.dir, "tavg_m0_mpred.rds")
 
 sres <- readRDS(rfl)
@@ -95,7 +101,7 @@ M0f <- ~ 0 + mu + elev +
     replicate = time, replicate_mapper = time.basis
   )
 
-mpred <- mclapply(mm, function(m) {
+mpred <- parallel::mclapply(mm, function(m) {
   ### define the data and prediction scenario
   sdata <- ldata[ldata$time %in% mm.times[[m]], ]
   sdata$y0 <- sdata$y
@@ -156,7 +162,7 @@ inla.setOption(
 ### models id
 models <- c("102", "121", "202", "220")
 
-for (imodel in 1:4) {
+for (imodel in seq_along(models)) {
   cat("Starting the forecasts for model", models[imodel], "\n")
   tt0 <- Sys.time()
 
@@ -166,8 +172,7 @@ for (imodel in 1:4) {
     paste0(
       "tavg_m",
       imodel,
-      "_n",
-      ndata,
+      "_fit",
       ".rds"
     )
   )
@@ -185,7 +190,7 @@ for (imodel in 1:4) {
   ### load the fitted model for the full dataset
   fit <- readRDS(rfl)
 
-  ## select the fitted hypeparameters mode:
+  ## select the fitted hyperparameters mode:
   ## likelihood precision and the u(s,t) parameters
   theta.ini <- fit$mode$theta[c(1, 4, 5, 6)]
 
@@ -194,7 +199,7 @@ for (imodel in 1:4) {
 
   cat("Doing for each scenario ... \n")
 
-  mpred <- mclapply(mm, function(m) {
+  mpred <- parallel::mclapply(mm, function(m) {
     ## select the data in the prediction scenario
     ii.m <- which(ldata$time %in% mm.times[[m]])
     sdata <- ldata[ii.m, ]
@@ -230,7 +235,7 @@ for (imodel in 1:4) {
     )
 
     ## define the temporal mesh (in the prediction scenario)
-    tmesh.m <- inla.mesh.1d(loc = mm.times[[m]])
+    tmesh.m <- fm_mesh_1d(loc = mm.times[[m]])
 
     ## define the spacetime model (in the prediction scenario)
     rt0 <- c(1, 2, 1, 2) * 1 ## temporal range

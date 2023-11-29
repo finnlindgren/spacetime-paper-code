@@ -3,10 +3,13 @@
 
 R.dir <- here::here("R")
 
+rerun <- FALSE
+
 ### load packages
 source(file.path(R.dir, "handle_packages.R"))
 # Minimum versions:
-if (!handle_packages(c(
+handle_packages(
+  c(
   "INLA" = "22.11.28",
   "INLAspacetime" = "0.1.2",
   "inlabru" = "2.7.0",
@@ -17,20 +20,7 @@ if (!handle_packages(c(
   "viridisLite" = NA,
   "patchwork" = NA,
   "grid" = NA
-))) {
-  stop("Packages not fully installed.")
-}
-library(INLA)
-library(inlabru)
-library(fmesher)
-library(ggplot2)
-library(fields)
-library(viridis)
-library(viridisLite)
-library(patchwork)
-library(grid)
-
-rerun <- FALSE
+), attach = TRUE)
 
 ## source the computations file
 if (rerun) {

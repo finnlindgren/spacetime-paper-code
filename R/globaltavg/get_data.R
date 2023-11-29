@@ -69,7 +69,7 @@ cat("Data saved to", wfl0, "\n")
 
 ### load the ETOPO  data
 load(file.path(data.files["elevation"]))
-cat("ETOPO data dimention:", dim(ETOPO2), "\n")
+cat("ETOPO data dimension:", dim(ETOPO2), "\n")
 
 ### extract the longitude (and fix) and latitude
 elon <- attr(ETOPO2, "lon")

@@ -7,8 +7,15 @@ output: pdf_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = !TRUE)
-library(sp)
-library(INLAspacetime)
+source(here::here("R", "handle_packages.R"))
+handle_packages(
+  c(
+    "sp" = NA,
+    "INLAspacetime" = NA,
+    maps = NA
+  ),
+  attach = TRUE
+)
 R.dir <- here::here("R", "globaltavg")
 data.dir <- here::here("data_files")
 year <- 2022
@@ -172,7 +179,7 @@ smoothed version, $s_s$, were used.
 We defined outlier if $|x_t-m|>5s$ or $|x_t-y_t|>5s_s$, for $m=\sum_{t=1}^nx_t/n$.
 
 ```{r outdetecting}
-wEpan <- 1 - seq(0, 1, length = 30)^2
+wEpan <- 1 - seq(0, 1, length.out = 30)^2
 wEpan <- wEpan[2:(length(wEpan) - 1)]
 wout <- parallel::mclapply(1:nssel, function(i) {
   return(outDetect(wtavg[i, ], weights = wEpan, ff = c(5, 5)))

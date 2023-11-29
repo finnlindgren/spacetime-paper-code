@@ -4,12 +4,13 @@
 data.dir <- here::here("data_files")
 figures.dir <- here::here("figures")
 
-library(INLA)
-library(INLAspacetime)
-library(inlabru)
-library(rgeos)
-
-sp::set_evolution_status(2L)
+source(here::here("R", "handle_packages.R"))
+handle_packages(
+  c(
+    INLA = NA,
+    INLAspacetime = NA,
+    inlabru = NA),
+  attach = TRUE)
 
 dir.create(figures.dir, showWarnings = FALSE, recursive = TRUE)
 
@@ -23,27 +24,29 @@ load(file.path(data.dir, "stmeshes.RData"))
 ### 1. get maps needed in the plots
 
 ### world map
-world.ll <- worldMap("+proj=longlat +datum=WGS84")
+world.ll <- worldMap("+proj=longlat +datum=WGS84", returnclass = "sf")
 world <- fm_transform(world.ll, "+proj=moll +units=km")
 
 ### world box
 wbox0 <- cbind(
   long = c(
-    seq(-1, 1, length = 201), rep(1, 101),
-    seq(1, -1, length = 201), rep(-1, 101)
+    seq(-1, 1, length.out = 201), rep(1, 101),
+    seq(1, -1, length.out = 201), rep(-1, 101)
   ) * 179.99999,
   lat = c(
-    rep(1, 201), seq(1, -1, length = 101),
-    rep(-1, 201), seq(-1, 1, length = 101)
+    rep(1, 201), seq(1, -1, length.out = 101),
+    rep(-1, 201), seq(-1, 1, length.out = 101)
   ) * 89.99999
 )
-wbox <- SpatialPolygons(
+wbox <- sf::st_as_sf(SpatialPolygons(
   list(Polygons(list(Polygon(wbox0)), "0")),
   proj4string = CRS("+proj=longlat +datum=WGS84")
-)
+))
 
-### oceaas = box - world
-oceans.ll <- gDifference(wbox, world.ll)
+### oceans = box - world
+use_s2 <- sf::sf_use_s2(FALSE)
+oceans.ll <- sf::st_difference(wbox, sf::st_union(world.ll))
+sf::sf_use_s2(use_s2)
 oceans <- fm_transform(oceans.ll, CRS("+proj=moll +units=km"))
 
 ### stations locations
@@ -56,7 +59,7 @@ bb
 
 ### projection
 gmesh$crs <- fm_CRS("sphere")
-wmesh <- fm_transform(gmesh, crs = world@proj4string, passthrough = TRUE)
+wmesh <- fm_transform(gmesh, crs = fm_crs(world), passthrough = TRUE)
 
 ### transform back to longlat
 lmesh <- fm_transform(gmesh, crs = CRS("+proj=longlat +datum=WGS84"), passthrough = TRUE)
@@ -84,7 +87,7 @@ pdf(wmfig,
 
 par(mfrow = c(1, 1), mar = c(0, 0, 1.5, 0), mgp = c(1, .5, 0), xaxs = "i", yaxs = "i", cex = 1.4)
 plot(oceans, col = rgb(.3, .7, 1, .5), border = c(0.5, 0.5), xlim = bb[1, ], ylim = bb[2, ])
-plot(world, col = gray(0.7, 0.5), border = gray(0.5, 0.5), add = TRUE)
+plot(world$geometry, col = gray(0.7, 0.5), border = gray(0.5, 0.5), add = TRUE)
 points(stations, pch = 19, cex = 0.75, col = "green")
 plot(wmesh, add = TRUE, t.sub = which(!i180))
 title(paste0(

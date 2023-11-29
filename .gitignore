@@ -1,3 +1,9 @@
+# Project specific
+/figures/
+/data_files/
+/covariance_data/
+/example_data/
+
 # History files
 .Rhistory
 .Rapp.history

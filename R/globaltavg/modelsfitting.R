@@ -1,9 +1,14 @@
 ### code to fit each one of the spacetime models
 
 ### libraries
-library(INLA)
-library(INLAspacetime)
-library(inlabru)
+source(here::here("R", "handle_packages.R"))
+handle_packages(
+  c(
+    INLA = NA,
+    INLAspacetime = NA,
+    inlabru = NA
+    ),
+  attach = TRUE)
 
 data.dir <- here::here("data_files")
 
@@ -22,7 +27,7 @@ rfls <- file.path(
   data.dir,
   paste0(
     "tavg_m", 0:4,
-    "_n", ndata,
+    "_fit",
     ".rds"
   )
 )
@@ -75,11 +80,13 @@ lhood <- like(
 ###   (recommended to have A = 2p, or p+1, where p is the number of hyperparameters)
 ###   (increasing B only makes sense for large problems)
 ###   (see INLA documentation for more details)
-inla.setOption(
-  inla.mode = "compact",
-  smtp = "pardiso",
-  pardiso.license = "~/.pardiso.lic"
-)
+if (file.exists("~/.pardiso.lic")) {
+  inla.setOption(
+    inla.mode = "compact",
+    smtp = "pardiso",
+    pardiso.license = "~/.pardiso.lic"
+  )
+}
 
 ### define control.compute options
 ccomp <- list(

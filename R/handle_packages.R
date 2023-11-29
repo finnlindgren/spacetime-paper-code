@@ -3,10 +3,12 @@
 #' @param needed a vector with named character entries indicating package name
 #' and version pairs. Warnings are given for packages that are not installed or
 #' have older versions, and installation instructions are shown.
+#' @param attach logical; if `TRUE`, run `library(packagename)` for each needed
+#' package and give an error if some package isn't installed.
 #'
 #' @return logical; TRUE if all the packages are installed and have the
 #' required versions
-handle_packages <- function(needed) {
+handle_packages <- function(needed, attach = FALSE) {
   installed <- names(needed) %in% installed.packages()
   names(installed) <- names(needed)
   version <- vapply(
@@ -32,8 +34,8 @@ handle_packages <- function(needed) {
 
   special_installation <-
     c(
-      "INLA" = 'install.packages("INLA", repos = c(options("repos", INLA="https://inla.r-inla-download.org/R/testing")))',
-      "INLAspacetime" = 'remotes::install_github("eliaskrainski/INLAspacetime")'
+      "INLA" = 'install.packages("INLA", repos = c(options("repos", INLA="https://inla.r-inla-download.org/R/testing")))'
+      # "INLAspacetime" = 'remotes::install_github("eliaskrainski/INLAspacetime")'
     )
 
   for (pkg in names(needed)[!version_ok]) {
@@ -65,6 +67,13 @@ handle_packages <- function(needed) {
         call. = FALSE
       )
     }
+  }
+
+  if (attach) {
+    if (!all(version_ok)) {
+      stop("Packages not fully installed.")
+    }
+    pkgs_ <- lapply(names(needed), library, character.only = TRUE)
   }
 
   # Return TRUE if all is ok

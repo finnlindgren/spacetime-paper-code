@@ -1,8 +1,14 @@
 ### load the checked dataset
 ### define basis functions, spacetime and variable id
 
-library(INLA)
-library(inlabru)
+source(here::here("R", "handle_packages.R"))
+handle_packages(
+  c(
+    "INLA" = NA,
+    "inlabru" = NA,
+    fmesher = NA
+  ),
+  attach = TRUE)
 
 data.dir <- here::here("data_files")
 
@@ -42,8 +48,8 @@ c(
 )
 
 ## latitude basis setting
-slat.basis.knots <- seq(-1, 1, length = 3)
-Blat.mesh <- inla.mesh.1d(
+slat.basis.knots <- seq(-1, 1, length.out = 3)
+Blat.mesh <- fm_mesh_1d(
   loc = slat.basis.knots,
   interval = c(-1, 1),
   boundary = "free",

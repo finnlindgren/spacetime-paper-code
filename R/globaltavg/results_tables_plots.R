@@ -1,23 +1,30 @@
 ### tables and plots for the paper
 
-library(INLA)
-library(INLAspacetime)
-library(inlabru)
-library(fmesher)
-library(fields)
-library(RColorBrewer)
-library(ggplot2)
-library(terra)
-library(tidyterra)
-library(tidyverse)
-library("ggplot2")
-library("sf")
-library("rnaturalearth")
-library("rnaturalearthdata")
-library(patchwork)
+source(here::here("R", "handle_packages.R"))
+handle_packages(
+  c(
+    INLA = NA,
+    INLAspacetime = NA,
+    inlabru = NA,
+    fmesher = NA,
+    fields = NA,
+    RColorBrewer = NA,
+    ggplot2 = NA,
+    terra = NA,
+    tidyterra = NA,
+    tidyverse = NA,
+    "ggplot2" = NA,
+    "sf" = NA,
+    "rnaturalearth" = NA,
+    "rnaturalearthdata" = NA,
+    patchwork = NA),
+  attach = TRUE)
 
 data.dir <- here::here("data_files")
 fig.dir <- here::here("figures")
+
+model_names <- c("M0", LETTERS[1:4])
+model_names_latex <- paste0("$\\M", c("o", letters[1:4]), "$")
 
 ### 2022 data
 ldata <- readRDS(file.path(data.dir, "longdata.rds"))
@@ -56,15 +63,13 @@ for (i in 1:5) {
   cat("Reading results for model", mtags[i], "\n")
   results[[i]] <- readRDS(file.path(
     data.dir,
-    paste0("tavg_m", i - 1, "_n", ndata, ".rds")
+    paste0("tavg_m", i - 1, "_fit.rds")
   ))
   results[[i]]$mpred <- readRDS(file.path(
     data.dir,
     paste0("tavg_m", i - 1, "_mpred_u.rds")
   )) ## NEW: tavg_m[0-4]_mpred_u.rds
 }
-model_names <- c("M0", LETTERS[1:4])
-model_names_latex <- paste0("$\\M", c("o", letters[1:4]), "$")
 names(results) <- model_names
 
 ### some outputs
@@ -208,9 +213,6 @@ gg.mpred.diff <-
   ylab("Statistic difference to D") +
   facet_grid(vars(Score), vars(Model), scales = "free")
 
-gg.mpred
-gg.mpred.diff
-
 png(file.path(fig.dir, "forecast_error_months.png"),
   pointsize = 12,
   units = "in",
@@ -291,7 +293,7 @@ ggb2.mpred
 dev.off()
 
 ### Equator mean and elevation effect
-lapply(results, function(r) r$summary.fix[1:2, 1:2])
+lapply(results, function(r) r$summary.fixed[1:2, 1:2])
 
 ### User-interpretable posterior marginals
 eR <- c(1, 6371, 1, 6371, 1, 1)
@@ -424,7 +426,7 @@ load(file.path(data.dir, "B_meshes.RData"))
 
 ## for plotting time basis functions
 Btime0 <- ibm_jacobian(time.basis, 1:ntimes)
-timeDate0 <- as.Date("2020-12-31") + 1:ntimes
+timeDate0 <- as.Date("2021-12-31") + 1:ntimes
 
 ### for eval and plotting the latitude basis functions
 lat0 <- -90:90
@@ -501,29 +503,28 @@ apply(bb, 1, diff)
 apply(bb, 1, diff) / 100
 
 ### define a grid over the full domain
-world <- worldMap()
+world <- worldMap(returnclass = "sf")
 wx0y0 <- list(
   x = seq(bb[1, 1] + 40, bb[1, 2], 80),
   y = seq(bb[2, 1] + 20, bb[2, 2], 80)
 )
 sapply(wx0y0, length)
-wxy0 <- SpatialPoints(
+wxy0 <- sf::st_as_sf(SpatialPoints(
   as.matrix(
     expand.grid(x = wx0y0$x, y = wx0y0$y)
   ),
-  world@proj4string
-)
-bbox(wxy0)
+  fm_CRS(world)
+))
 
 ### world box
 wbox0 <- cbind(
   long = c(
-    seq(-1, 1, length = 201), rep(1, 101),
-    seq(1, -1, length = 201), rep(-1, 101)
+    seq(-1, 1, length.out = 201), rep(1, 101),
+    seq(1, -1, length.out = 201), rep(-1, 101)
   ) * 179.99999,
   lat = c(
-    rep(1, 201), seq(1, -1, length = 101),
-    rep(-1, 201), seq(-1, 1, length = 101)
+    rep(1, 201), seq(1, -1, length.out = 101),
+    rep(-1, 201), seq(-1, 1, length.out = 101)
   ) * 89.99999
 )
 wbox <- SpatialPolygons(
@@ -563,13 +564,13 @@ for (el in 1:2) {
   cat(
     "Pixels in", c("whole Earth", "land")[el], ":",
     length(ii.wxy0), "(",
-    100 * length(ii.wxy0) / nrow(coordinates(wxy0)), "%)\n"
+    100 * length(ii.wxy0) / nrow(wxy0), "%)\n"
   )
 
   ### convert selected pixels to longlat for the projection
   wxy0ll <- fm_transform(
     wxy0[ii.wxy0, ],
-    wbox@proj4string
+    fm_crs(wbox)
   )
 
   ### projector based on gmesh
@@ -703,13 +704,13 @@ for (el in 1:2) {
   cat(
     "Pixels in", c("whole Earth", "land")[el], ":",
     length(ii.wxy0), "(",
-    100 * length(ii.wxy0) / nrow(coordinates(wxy0)), "%)\n"
+    100 * length(ii.wxy0) / nrow(wxy0), "%)\n"
   )
 
   ### convert selected pixels to longlat for the projection
   wxy0ll <- fm_transform(
     wxy0[ii.wxy0, ],
-    wbox@proj4string
+    fm_crs(wbox)
   )
 
   ### projector based on gmesh

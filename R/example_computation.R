@@ -6,19 +6,16 @@ data.dir <- here::here("example_data")
 dir.create(data.dir, showWarnings = FALSE, recursive = TRUE)
 
 source(file.path(R.dir, "handle_packages.R"))
-if (!handle_packages(c(
-  "INLA" = "22.11.28",
-  "INLAspacetime" = "0.1.3",
-  "inlabru" = "2.7.0",
-  "sp" = NA
-))) {
-  stop("Packages not fully installed.")
-}
-
-library(INLAspacetime)
-library(inlabru)
-library(INLA)
-library(sp)
+handle_packages(
+  c(
+    "INLA" = "22.11.28",
+    "INLAspacetime" = "0.1.3",
+    "inlabru" = "2.7.0",
+    "sp" = NA,
+    fmesher = NA
+  ),
+  attach = TRUE
+)
 
 ## Seed
 set.seed(20200119)
@@ -44,7 +41,7 @@ max.e <- c(0.25, 1)
 t.max <- 3
 
 ### --------------------------------------------------------------
-mesh.t <- inla.mesh.1d(seq(0, t.max, by = 1))
+mesh.t <- fm_mesh_1d(seq(0, t.max, by = 1))
 
 ### --------------------------------------------------------------
 pol <- matrix(
@@ -60,7 +57,7 @@ boundary <- SpatialPolygons(list(Polygons(list(Polygon(
   pol
 )), ID = "Boundary")))
 
-mesh.s <- inla.mesh.2d(boundary = list(boundary), max.edge = max.e)
+mesh.s <- fm_mesh_2d_inla(boundary = list(boundary), max.edge = max.e)
 
 (ns <- mesh.s$n)
 
@@ -160,13 +157,13 @@ print(M)
 
 fits <- vector("list", length(models))
 
-
-inla.setOption(
-  pardiso.license = "~/.pardiso.lic",
-  smtp = "pardiso",
-  num.threads = "4:-1",
-  inla.mode = "experimental"
-)
+if (file.exists("~/.pardiso.lic")) {
+  inla.setOption(
+    pardiso.license = "~/.pardiso.lic",
+    smtp = "pardiso",
+    num.threads = "4:-1",
+  )
+}
 
 ### --------------------------------------------------------------
 for (i in 1:length(M)) {

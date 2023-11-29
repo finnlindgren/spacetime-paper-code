@@ -28,7 +28,7 @@ wtavg <- wtavg0[iissel, ]
 cat("Consider", sum(nobs.s[iissel]), "observations on", nssel, "stations\n")
 
 ### check outliers in the data
-wEpan <- 1 - seq(0, 1, length = 30)^2
+wEpan <- 1 - seq(0, 1, length.out = 30)^2
 wEpan <- wEpan[2:(length(wEpan) - 1)]
 wout <- parallel::mclapply(1:nssel, function(i) {
   return(outDetect(wtavg[i, ], weights = wEpan, ff = c(5, 5)))
@@ -70,33 +70,39 @@ cat("Detected", nstdout, "stations with locally low/high variance\n")
 rm.periods <- vector("list", nstdout)
 
 if (year == 2021) {
-  snames <- "USR0000ACOT"
-  i.s.rm <- which(dimnames(wtavg)[[1]][istdout] %in% snames)
-  stopifnot(length(i.s.rm) == 1)
-  rm.periods[[i.s.rm[1]]] <- 262:365
+  removal <-
+    list(
+      "USR0000ACOT" = 262:365
+    )
 }
 
 if (year == 2022) {
-  snames <- c(
-    "USC00091732", "USC00411048", "USC00412786", "USC00413507",
-    "USC00518108", "USR0000ACOT", "USS0021B31S", "USS0022C12S",
-    "USW00000230", "USW00053952"
-  ) ## , "USS0022G24S")
-  i.s.rm <- which(dimnames(wtavg)[[1]][istdout] %in% snames)
+  removal <-
+    list(
+      "USC00091732" = 178:243,
+      "USC00411048" = integer(0),
+      "USC00412786" = integer(0),
+      "USC00413507" = integer(0),
+      "USC00518108" = 170:365,
+      "USR0000ACOT" = 1:133,
+      "USS0021B31S" = 235:340,
+      "USS0022C12S" = 294:331,
+      "USW00000230" = integer(0),
+      "USW00053952" = integer(0)
+    )
+}
 
-  stopifnot(length(i.s.rm) == 10)
-
-  rm.periods[[i.s.rm[1]]] <- 178:243
-  rm.periods[[i.s.rm[5]]] <- 170:365
-  rm.periods[[i.s.rm[6]]] <- 1:133
-  rm.periods[[i.s.rm[7]]] <- 235:340
-  rm.periods[[i.s.rm[8]]] <- 294:331
-  ## 	rm.periods[[i.s.rm[5]]] <- 210:365
+snames <- names(removal)
+for (idx in seq_along(istdout)) {
+  nm <- dimnames(wtavg)[[1]][istdout[idx]]
+  if (nm %in% snames) {
+    rm.periods[[idx]] <- removal[[nm]]
+  }
 }
 
 
 cat("Manually set to NA data on days\n")
-for (i in 1:nstdout) {
+for (i in seq_len(nstdout)) {
   if (length(rm.periods[[i]]) > 0) {
     cat(rm.periods[[i]], "\nof station", dimnames(wtavg)[[1]][istdout[i]], "\n")
   }
