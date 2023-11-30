@@ -210,7 +210,7 @@ for (imodel in seq_along(models)) {
       mapper = stmapper.full,
       input = list(
         space = cbind(
-          sdata$s1loc, sdata$s1loc, sdata$s1loc
+          sdata$s1loc, sdata$s2loc, sdata$s3loc
         ),
         time = sdata$time
       ),

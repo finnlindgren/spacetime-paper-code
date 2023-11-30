@@ -80,7 +80,7 @@ wmfig
 #    res=300,
 #    type = "cairo")
 pdf(wmfig,
-  pointsize = 20,
+  pointsize = 30,
   width = 16,
   height = 8.1
 )

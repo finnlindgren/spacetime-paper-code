@@ -191,9 +191,9 @@ for (i in 1:length(M)) {
   print(round(fits[[i]]$cpu.used[4], 2))
 }
 
-(cput <- sapply(fits, function(x) x$cpu[[4]]))
+(cput <- sapply(fits, function(x) x$cpu.used[[4]]))
 (nfn <- sapply(fits, function(x) x$misc$nfunc))
-nfn / cput
+# nfn / cput
 
 sapply(fits, function(x) x$mode$theta)
 
