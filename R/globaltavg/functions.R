@@ -222,3 +222,32 @@ stdSubs <- function(x, nsub = 12, fs = 15) {
   attr(r, "st") <- st
   return(r)
 }
+#' Function to compute PO, MSE, MAE, CRPS and SCRPS
+#' @param r the inla output
+#' @param y the data
+#' @param i index to subset
+fstats <- function(r, i, y) {
+    crps.g <- function(y, m, s) {
+        md <- y - m
+        s/sqrt(pi) - 2 * s * dnorm(md/s) + md * (1 - 2 * pnorm(md/s))
+    }
+    scrps.g <- function(y, m, s) {
+        md <- y - m
+        -0.5 * log(2 * s/sqrt(pi)) - sqrt(pi) * (s * dnorm(md/s) - 
+                                                 md/2 + md * pnorm(md/s))/s
+    }
+    s2m <- INLA::inla.emarginal(
+                     function(x) exp(-x),
+                     r$internal.marginals.hyperpar[[1]])
+    m.i <- r$summary.fitted.values$mean[i]
+    s.i <- sqrt(r$summary.fitted.values$sd[i]^2 + s2m)
+    c(lpo = -mean(dnorm(
+                 y[i],
+                 m.i,
+                 s.i,
+                 log = TRUE)),
+      mse = mean((y[i] - m.i)^2),
+      mae = mean(abs(y[i] - m.i)),
+      crps = -mean(crps.g(y[i], m.i, s.i)),
+      scrps = -mean(scrps.g(y[i], m.i, s.i)))
+}

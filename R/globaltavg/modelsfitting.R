@@ -82,9 +82,13 @@ lhood <- like(
 ###   (see INLA documentation for more details)
 if (file.exists("~/.pardiso.lic")) {
   inla.setOption(
-    inla.mode = "compact",
     smtp = "pardiso",
-    pardiso.license = "~/.pardiso.lic"
+    pardiso.license = "~/.pardiso.lic",
+    num.threads = "4:8"
+  )
+} else {
+  inla.setOption(
+    num.threads = "2:2"
   )
 }
 
@@ -105,24 +109,15 @@ M0f <- ~ 0 + mu + elev +
 
 
 ### verify the mode components
-print(summary(component_list(
-  M0f,
-  lhoods = list(lhood), verbose = FALSE
-)))
+#print(summary(component_list(
+ # M0f,
+  #lhoods = list(lhood), verbose = FALSE
+#)))
 
-### initial values for theta
-theta.ini <- c(-2.4, -1, 2)
-
-fit <- bru(
-  components = M0f,
-  lhood,
-  options = list(
-    verbose = TRUE,
-    control.compute = ccomp,
-    control.mode = list(theta = theta.ini, restart = TRUE),
-    control.inla = list(int.strategy = "eb")
-  )
-)
+### R^2 = 1 - ssres/sstot
+### sstot = sum((y - mean(y))^2)
+  sqrtot <- sum((ldata$y - mean(ldata$y, na.rm = TRUE))^2, na.rm = TRUE)
+  cat("SQR Total:", sqrtot, "\n")
 
 ### select elements of the output to save
 rnams <- c(
@@ -134,42 +129,59 @@ rnams <- c(
   "mlik", "mode", "cpu.used"
 )
 
-sres <- fit[rnams]
-sres$summary.fitted.values <-
-  fit$summary.fitted.values[1:ndata, c(1, 2)]
-rownames(sres$summary.fitted.values) <- NULL
+if(!file.exists(rfls[1])) {
+  ## initial values for theta
+  theta.ini <- c(-1, -0.0, 2.0)
 
-### R^2 = 1 - ssres/sstot
-### sstot = sum((y - mean(y))^2)
-sqrtot <- sum((ldata$y - mean(ldata$y, na.rm = TRUE))^2, na.rm = TRUE)
-cat("SQR Total:", sqrtot, "\n")
-
-### ssres = sum(y - fit) ^2
-sqrres <- sum((ldata$y - sres$summary.fitted.values$mean)^2, na.rm = TRUE)
-cat("SQR Res:", sqrres, "\n")
-
-### Some fit statistics
-sres$stats <- c(
-  R2 = 1 - sqrres / sqrtot,
-  INLAspacetime::stats.inla(
-    fit,
-    y = ldata$y, ### same data used to fit
-    fsummarize = function(x) {
-      mean(x, na.rm = TRUE)
-    }
+  fit <- bru(
+    components = M0f,
+    lhood,
+    options = list(
+      verbose = TRUE,
+      num.threads = "6:1",
+      control.compute = ccomp,
+      control.mode = list(theta = theta.ini, restart = TRUE),
+      control.inla = list(int.strategy = "eb")
+    )
   )
-)
 
-print(round(sres$stats, 4))
+  ## select output elements and refine fitted values
+  sres <- fit[rnams]
+  sres$summary.fitted.values <-
+    fit$summary.fitted.values[1:ndata, c(1, 2)]
+  
+  ## refine the summary.fitted.values (less memory)
+  rownames(sres$summary.fitted.values) <- NULL
+  
+  ## add the data used to fit
+  sres$ldata <- ldata
 
-### save
-saveRDS(
-  object = sres,
-  file = rfls[1]
-)
+  ## ssres = sum(y - fit) ^2
+  sqrres <- sum((ldata$y - sres$summary.fitted.values$mean)^2, na.rm = TRUE)
+  cat("SQR Res:", sqrres, "\n")
 
-rm(fit)
-gc(reset = TRUE)
+  ## Some fit statistics
+  sres$stats <- c(
+    R2 = 1 - sqrres / sqrtot,
+    INLAspacetime::stats.inla(
+      fit,
+      y = ldata$y, ### same data used to fit
+      fsummarize = function(x) {
+        mean(x, na.rm = TRUE)
+      }
+    )
+  )
+
+  ## save
+  saveRDS(
+    object = sres,
+    file = rfls[1]
+  )
+
+  rm(fit)
+  gc(reset = TRUE)
+
+}
 
 ### define model components
 Mcomps <- ~ 0 + mu + elev +
@@ -190,21 +202,23 @@ Mcomps <- ~ 0 + mu + elev +
 ### models id
 models <- c("102", "121", "202", "220")
 
-for (imodel in c(1, 2, 3, 4)) {
-  ### initial values for theta
+iifit <- which(!sapply(rfls[-1], file.exists))
+
+for (imodel in iifit) {
+  ## initial values for theta
   theta.ini <- c(
-    -1.45, -1, 1.2,
-    c(-1.5, -1, -1.5, -1.5)[imodel],
-    c(2.0, 4, 1.5, 2.0)[imodel],
-    1
+    -1, -0.0, 2.0,
+    c(-0.5, -0.5, -0.5, -0.5)[imodel],
+    c(3.0, 5, 3, 4.0)[imodel],
+    0.5
   )
 
   cat("Fitting model", models[imodel], "\n")
   t0 <- Sys.time()
   rfl <- rfls[1 + imodel]
 
-  ### define the spacetime model
-  rt0 <- c(1, 2.0, 1, 2.0) * 1 ## temporal range
+  ## define the spacetime model
+  rt0 <- c(2, 4.0, 3, 2.0) ## ref for the temporal range prior
   stmodel <- stModel.define(
     gmesh, tmesh, models[imodel],
     control.priors = list(
@@ -215,26 +229,30 @@ for (imodel in c(1, 2, 3, 4)) {
     constr = TRUE
   )
 
-  ### print number of non-zeros in Q_u
+  ## print number of non-zeros in Q_u
   cat(
     "Number of non-zeros in Q_u:",
     stmodel$f$cgeneric$data$matrices$xx[2], "\n"
   )
 
-  ### define the mapper for the spacetime model
+  ## define the mapper for the spacetime model
   stmapper <- bru_get_mapper(stmodel)
 
   ### verify the mode components
-  print(summary(component_list(Mcomps, lhoods = list(lhood), verbose = FALSE)))
+ # print(summary(component_list(Mcomps, lhoods = list(lhood), verbose = FALSE)))
 
-  ### set overall INLA options
+### num.threads="A:B" : uses A parallel function evaluations each one with B threads
+###   (the amount of memory scales approx. linearly in A)
+###   (recommended to have A = 2p, or p+1, where p is the number of hyperparameters)
+###   (increasing B only makes sense for large problems)
+
   ## fit
   fit <- bru(
     components = Mcomps,
     lhood,
     options = list(
       verbose = TRUE,
-      num.threads = "3:16", ### with 48 threads
+      # num.threads = "3:16", # 4*8=32 threads
       control.compute = ccomp,
       control.mode = list(
         theta = theta.ini,
@@ -244,25 +262,19 @@ for (imodel in c(1, 2, 3, 4)) {
     )
   )
 
-  ### select elements of the output to save
-  rnams <- c(
-    paste0(
-      "summary.",
-      c("fixed", "hyperpar", "random", "fitted.values")
-    ),
-    "internal.marginals.hyperpar", "mlik", "mode", "cpu.used"
-  )
-
+  ## selected output
   sres <- fit[rnams]
+  
+  ## refine the summary.fitted.values (less memory)
   sres$summary.fitted.values <-
     fit$summary.fitted.values[1:ndata, c("mean", "sd")]
   rownames(sres$summary.fitted.values) <- NULL ### to use less mem
 
-  ### compute some "goodness-of-fit" statistics
+  ## compute some "goodness-of-fit" statistics
   sqrres <- sum((ldata$y - sres$summary.fitted.values$mean)^2, na.rm = TRUE)
   cat("SQR Res:", sqrres, "\n")
 
-  ### Some fit stats
+  ## Some fit stats
   sres$stats <- c(
     R2 = 1 - sqrres / sqrtot,
     INLAspacetime::stats.inla(
@@ -275,7 +287,8 @@ for (imodel in c(1, 2, 3, 4)) {
   )
   print(round(sres$stats, 4))
 
-  ### save
+
+  ## save the selected output
   saveRDS(
     object = sres,
     file = rfl

@@ -192,8 +192,8 @@ iout <- which(nout > 0)
 A total of `r format(ntot.out)` outliers were found 
 in `r format(length(iout))` time series as shown in the next Figures. 
 
-```{r outfig, fig.width=15, fig.height=10, fig.cap="Time series with detected oulier observations."}
-par(mfrow = c(7, 7), mar = c(0.1, 1.5, .1, .1), mgp = c(2, 0.5, 0))
+```{r outfig, fig.width=15, fig.height=20, fig.cap="Time series with detected oulier observations."}
+par(mfrow = c(22, 12), mar = c(0.1, 1.5, .1, .1), mgp = c(2, 0.5, 0))
 for (i in iout) {
   m.i <- attr(wout[[i]], "m")
   xs <- m.i + attr(wout[[i]], "xs")
@@ -254,28 +254,44 @@ stdsubs <- Reduce("+", ss.results) > 0
 istdout <- which(stdsubs)
 nstdout <- length(istdout)
 
+if (year == 2021) {
+  removal <-
+    list(
+      "USR0000ACOT" = 262:365
+    )
+}
+
+if (year == 2022) {
+  removal <-
+    list(
+      "USC00091732" = 178:243,
+      "USC00411048" = integer(0),
+      "USC00412786" = integer(0),
+      "USC00413507" = integer(0),
+      "USC00518108" = 170:365,
+      "USR0000ACOT" = 1:133,
+      "USS0021B31S" = 235:340,
+      "USS0022C12S" = 294:331,
+      "USW00000230" = integer(0),
+      "USW00053952" = integer(0)
+    )
+}
+
+snames <- names(removal)
 rm.periods <- vector("list", nstdout)
-
-snames <- c(
-  "USC00091732", "USC00411048", "USC00412786", "USC00413507",
-  "USC00518108", "USR0000ACOT", "USS0021B31S", "USS0022C12S",
-  "USW00000230", "USW00053952"
-) ## , "USS0022G24S")
-i.s.rm <- which(dimnames(wtavg)[[1]][istdout] %in% snames)
-
-stopifnot(length(i.s.rm) == 10)
-
-rm.periods[[i.s.rm[1]]] <- 178:243
-rm.periods[[i.s.rm[5]]] <- 170:365
-rm.periods[[i.s.rm[6]]] <- 1:133
-rm.periods[[i.s.rm[7]]] <- 235:340
-rm.periods[[i.s.rm[8]]] <- 294:331
-## 	rm.periods[[i.s.rm[5]]] <- 210:365
+for (idx in seq_along(istdout)) {
+  nm <- dimnames(wtavg)[[1]][istdout[idx]]
+  if (nm %in% snames) {
+    rm.periods[[idx]] <- removal[[nm]]
+  }
+}
 
 cat("Manually set to NA data on days\n")
 for (i in 1:nstdout) {
   if (length(rm.periods[[i]]) > 0) {
-    cat(rm.periods[[i]], "\nof station", dimnames(wtavg)[[1]][istdout[i]], "\n")
+    cat(rm.periods[[i]], "\nof station", 
+        dimnames(wtavg)[[1]][istdout[i]], "\n", 
+        fill = TRUE)
   }
 }
 ```
@@ -284,14 +300,15 @@ We found `r format(nstdout)` time series with periods of low variability.
 Then we manually removed the data represented with points in red color 
 in the next Figure. 
 
-```{r stdoutfig, fig.width=7, fig.height=3*max(3,round(nstdout/10)), fig.cap="Time series with detected locally low/high variations."}
-par(mfrow = c(max(3, round(nstdout / 10)), 1), mar = c(2, 2, 2, .1), mgp = c(2, 0.5, 0))
+```{r stdoutfig, fig.width=12, fig.height=15, out.width="89%", fig.cap="Time series with detected locally low/high variations, with removed data shown in red."}
+par(mfrow = c(5, 2), mar = c(2, 2, 2, .1), mgp = c(2, 0.5, 0))
 for (i in 1:nstdout) {
   plot(wtavg[istdout[i], ],
     type = "l", xlab = "", ylab = "", axes = FALSE,
     main = dimnames(wtavg)[[1]][istdout[i]]
   )
-  points(wtavg[istdout[i], ], pch = 8, col = 1 + (1:365 %in% rm.periods[[i]]))
+  points(wtavg[istdout[i], ], pch = 8, 
+         col = 1 + (1:365 %in% rm.periods[[i]]))
   axis(1, 5 * (0:73), las = 2)
   axis(2)
 }

@@ -20,8 +20,6 @@ RGT=R/globaltavg
 default:
 	@grep "^#" Makefile
 
-pkgcheck:
-
 data:
 	$(RSCRIPT) --vanilla $(RGT)/get_data.R
 	$(RSCRIPT) --vanilla $(RGT)/datacheck.R

@@ -67,7 +67,8 @@ for (i in 1:5) {
   ))
   results[[i]]$mpred <- readRDS(file.path(
     data.dir,
-    paste0("tavg_m", i - 1, "_mpred_u.rds")
+    paste0("tavg_m", i - 1, "_mpred",
+           c("", "_u")[(i>1)+1], ".rds")
   )) ## NEW: tavg_m[0-4]_mpred_u.rds
 }
 names(results) <- model_names
@@ -79,8 +80,21 @@ sapply(results, function(x) unname(x$mode$theta))
 sapply(results, function(x) x$mlik[[2]])
 sapply(results, function(x) x$summary.fixed$mean)
 
+### temporary fix for bug in INLAspacetime::stats.inla:
+### recompute PO, CRPS and SCRPS
+source(here::here("R", "globaltavg", "functions.R"))
+
+stab.tmp <- as.data.frame(t(
+    sapply(results, fstats, i = which(!is.na(ldata$y)), y = ldata$y)))
+
+stab.tmp[, c(1, 4,5)]
+
 ### gof stats
 round(gof.tab <- as.data.frame(t(sapply(results, function(r) r$stats))), 5)
+
+gof.tab$lpo <- stab.tmp$lpo
+gof.tab$crps <- stab.tmp$crps
+gof.tab$scrps <- stab.tmp$scrps
 
 df <- t(as.matrix(gof.tab))
 df[1:length(as.vector(df))] <- sprintf("%1.4f", df)

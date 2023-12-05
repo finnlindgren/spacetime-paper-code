@@ -1,10 +1,15 @@
+R.dir <- here::here("R")
 # Must run in the directory above the R code.
-stopifnot(file.exists("R/covariance_plots.R"))
+stopifnot(file.exists(file.path(R.dir, "covariance_plots.R")))
 
 # Set TRUE to overwrite plots on disk
-overwrite_plots <- FALSE
+if (!exists("overwrite_plots")) {
+  overwrite_plots <- FALSE
+}
 # Set to 1 or 2. The example in the paper is for DIM=2
-DIM <- 2
+if (!exists("DIM")) {
+  DIM <- 2 # spatial dimension (only 1d and 2d implemented)
+}
 
 # Where to read the computed covariances, from R/covariance_computation.R
 data.dir <- here::here("covariance_data")
